@@ -1,0 +1,55 @@
+pipeline {
+    agent any
+
+    environment {
+        tworkspace="$workspace"
+}
+
+    stages {
+        stage('checkout') {
+            steps {
+                cleanWs()
+                checkout([$class: 'GitSCM', branches: [[name: '*/main']], extensions: [], userRemoteConfigs: [[credentialsId: 'a11a4814-dfd3-41ea-a0ee-c7ae13fafc98', url: 'https://gitlab.com/yosra7/automationdocker.git']]])
+            }
+        }
+        stage('run docker') {
+            steps {
+                sh '''
+                sudo docker rmi yosradocker/imagehtml:latest
+                sudo docker stop myDockerwebapp
+                sudo docker rm myDockerwebapp
+                sudo docker build -t imagehtml:v1 .
+                sudo docker login --username yosradocker -p yosradocker
+                sudo docker tag imagehtml:v1 yosradocker/imagehtml
+                sudo docker push yosradocker/imagehtml:latest
+                sudo docker run --name myDockerwebapp -p 8081:80 -d -it yosradocker/imagehtml:latest
+                
+                '''
+                }
+        }
+
+
+        stage('run tests') {
+            steps {
+                sh '''
+                pip3 install selenium
+                pip3 install unittest2
+                pip3 install html-testRunner
+                python3 testcase.py
+                '''
+                }
+        }
+    }
+    
+    post {
+        
+      success {
+
+       emailext attachmentsPattern: '/reports/*' , attachLog: true, body: 'bouassida', subject: 'image is build and container is runned', to: 'yosra.bouassida15@gmail.com'
+      }
+      failure {
+       emailext attachLog: true, body: 'bouassida', subject: 'image is not build ', to: 'yosra.bouassida15@gmail.com'
+      }
+}
+
+}
